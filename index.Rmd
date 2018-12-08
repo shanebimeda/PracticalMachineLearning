@@ -1,0 +1,169 @@
+---
+title: "Practical Machine Learning Course Project"
+author: "Shane B. Bimeda"
+date: "December 8, 2018"
+output: html_document
+---
+
+
+### Abstract
+The report shows the analysis done to the **pmltrain.csv** and **pmltesting.csv** datasets to ultimately predict the manner in which the exercise was done by the subjects.  
+The training data (**pmltraining.csv**) and testing data (**pmltesting.csv**) had undergone the same exploratory and data cleaning processes to make them fit for analysis.Training dataset was split into multiple train and test sets for use in the  cross-validation processes during the model-building.  
+In the model building, the author used **Recursive Partitioning Method** (**rpart**) in the **train()** function in the **caret package** and **Random Forest** from its eponymous package (**randomForest package**). The models were run on their respective test sets and their error and accuracy rates were calculated.
+
+**Overall, the model built using the Random Forest method gave the highest accuracy metrics with its predictions as compared with the rpart model method.**
+
+###Data
+The large dataset came from the Weight Lifting Exercises Dataset *see References* of the Human Activity Recognition Research of Velloso et. al. (2013). Data was gathered through the following procedure stated in the cited study:
+
+*"Six young health participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions: exactly according to the specification (Class A), throwing the elbows to the front (Class B), lifting the dumbbell only halfway (Class C), lowering the dumbbell only halfway (Class D) and throwing the hips to the front (Class E)."*  
+*"Class A corresponds to the specified execution of the exercise, while the other 4 classes correspond to common mistakes.
+Participants were supervised by an experienced weight lifter to make sure the execution complied to the manner they were
+supposed to simulate. The exercises were performed by six male participants aged between 20-28 years, with little weight lifting
+experience. We made sure that all participants could easily simulate the mistakes in a safe and controlled manner by using a
+relatively light dumbbell (1.25kg)."*  
+
+###Preliminaries (Exploratory and Data Cleaning)
+####This assumes that the directory was already set where the datasets are found.  
+
+```{r, eval = TRUE, echo = TRUE, warning = FALSE, error=FALSE, message=FALSE}
+library(caret)
+library(data.table)
+library(randomForest)
+set.seed(3433)
+
+pmltraining <- read.csv("pml-training.csv")
+pmltesting <- read.csv("pml-testing.csv")
+```
+####subset the huge dataframe and make the needed train and test set from the training set for the cross validation
+
+```{r, eval= TRUE, echo = TRUE, warning = FALSE, error=FALSE, message = FALSE}
+
+training <- cbind(pmltraining[, 2], pmltraining[, 6:7], pmltraining[, 8:11], pmltraining[, 37:49],
+                  pmltraining[, 60:68], pmltraining[, 84:86], pmltraining[, 102], pmltraining[, 113:124],
+                  pmltraining[, 140], pmltraining[, 151:160])
+
+inTrain <- createDataPartition(training$classe, p = 0.75, 
+                               list = FALSE)
+train<- training[inTrain,]
+trainTest<- training[-inTrain,]
+
+testing <- cbind(pmltesting[, 2], pmltesting[, 6:7], pmltesting[, 8:11], pmltesting[, 37:49],
+                 pmltesting[, 60:68], pmltesting[, 84:86], pmltesting[, 102], pmltesting[, 113:124],
+                 pmltesting[, 140], pmltesting[, 151:160])
+
+```
+
+####look at our datasets/explore again
+```{r, eval= TRUE, echo = TRUE, warning = FALSE, error=FALSE, message=FALSE}
+dim(train)
+dim(trainTest)
+dim(testing)
+```
+
+###Training Proper
+####**rpart/Recursive Partitioning with preProcessing and Cross Validation**
+
+```{r, eval= TRUE, echo = TRUE, warning = FALSE, error=FALSE, message=FALSE}
+library(rpart);library(rattle); set.seed(143)
+```
+
+```{r, eval= TRUE, echo = TRUE, warning = FALSE, error=FALSE, message=FALSE}
+modrtree2 <- train(x = train[, -56], 
+                  y = train$classe, method = "rpart",
+                  preProcess = c("scale", "center"))
+
+fancyRpartPlot(modrtree2$finalModel)
+
+predrtree2 <- predict(modrtree2, newdata = trainTest)
+
+confusionMatrix(predrtree2, trainTest$classe)
+```
+
+
+####As we can see, the **Accuracy** of our rpart model is very low (**48.59%**). This means that the prediction of our model (on how well the person performs the exercise) is less likely to be true most of the time.  
+
+####**Random Forest  and Cross Validation**
+####**randomForest()**
+
+
+```{r, eval= TRUE, echo = TRUE, warning = FALSE, error=FALSE, message=FALSE}
+library(caret)
+library(data.table)
+library(randomForest)
+
+set.seed(3433)
+```  
+
+
+####load the training and testing datasets
+
+```{r, eval= TRUE, echo = TRUE, warning = FALSE, error=FALSE, message=FALSE}
+pmltraining <- read.csv("pml-training.csv")
+pmltesting <- read.csv("pml-testing.csv")
+```
+
+```{r, eval= TRUE, echo = TRUE, warning = FALSE, error=FALSE, message=FALSE}
+pmltraining <- as.data.table(pmltraining)
+
+pmltesting <- as.data.table(pmltesting)
+
+training <- cbind(pmltraining[, 2], pmltraining[, 6:7], pmltraining[, 8:11], pmltraining[, 37:49],
+                  pmltraining[, 60:68], pmltraining[, 84:86], pmltraining[, 102], pmltraining[, 113:124],
+                  pmltraining[, 140], pmltraining[, 151:160])
+
+inTrain <- createDataPartition(training$classe, p = 0.6, 
+                               list = FALSE)
+train<- training[inTrain,]
+test<- training[-inTrain,]
+
+testing <- cbind(pmltesting[, 2], pmltesting[, 6:7], pmltesting[, 8:11], pmltesting[, 37:49],
+                 pmltesting[, 60:68], pmltesting[, 84:86], pmltesting[, 102], pmltesting[, 113:124],
+                 pmltesting[, 140], pmltesting[, 151:160])
+
+dim(train); dim(test); dim(testing)
+```
+
+```{r, eval= TRUE, echo = TRUE, warning = FALSE, error=FALSE, message=FALSE}
+modrf <- randomForest(x = train[, -56], 
+                           y = train$classe)
+
+predrf <- predict(modrf, test)
+
+confusionMatrix(test$classe, predrf) 
+```
+####As we can see, the **Accuracy** of our random forest model is really very high (**99.57%**). This means that the prediction of our model (on how well the person performs the exercise) is most likely to be true most of the time. Furthermore, this validates the expectation that the random forest model will be much better than the decision tree (rpart) model.
+
+
+###**Answers on the problem set**   
+####Predictions of the random forest model on the **testing** data  
+####Here we see that the 2nd variable (new_window) of **testing** data only has 1 factor level so we have to make it the same with the **train** data (with 2 factor levels) so that our model will work.
+
+```{r, eval= TRUE, echo = TRUE, warning = FALSE, error=FALSE, message=FALSE}
+str(testing)
+```  
+
+```{r, eval= TRUE, echo = TRUE, warning = FALSE, error=FALSE, message=FALSE}
+colnames_train <- colnames(train)
+colnames_testing <- colnames(testing)
+
+levels(testing$new_window) <- levels(train$new_window)
+all.equal(colnames_train[1:length(colnames_train) -1], colnames_testing[1:length(colnames_testing)-1])
+
+``` 
+
+####This is very important to be TRUE or our model will not work on this testing dataset.  
+####**Finally, here are my answers:**
+
+```{r, eval= TRUE, echo = TRUE, warning = FALSE, error=FALSE, message=FALSE}
+predTesting <- predict(modrf, testing)
+
+predTesting
+```  
+
+
+###Reference
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises .
+Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM
+SIGCHI, 2013. 
+
